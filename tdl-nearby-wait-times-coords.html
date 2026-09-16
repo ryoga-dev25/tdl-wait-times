@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>近くの待ち時間（座標入力版）</title>
+<style>
+  :root{
+    --bg:#0f1729;
+    --bg-elevated:#16213d;
+    --card:#1c2947;
+    --ink:#f5f3ea;
+    --ink-dim:#a9b2c8;
+    --line:#2a3a5f;
+    --gold:#e8b854;
+    --green:#5fb389;
+    --amber:#e8a154;
+    --red:#d9695a;
+    --font-display: 'Cinzel', 'Georgia', serif;
+    --font-body: 'Fira Sans', 'Hiragino Sans', sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]){
+      --bg:#f4f1e8;
+      --bg-elevated:#ffffff;
+      --card:#ffffff;
+      --ink:#1c2947;
+      --ink-dim:#5a6180;
+      --line:#e0dccd;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f1e8;
+    --bg-elevated:#ffffff;
+    --card:#ffffff;
+    --ink:#1c2947;
+    --ink-dim:#5a6180;
+    --line:#e0dccd;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    min-height: 100vh;
+    padding: 20px 16px 40px;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(232,184,84,0.08), transparent 55%),
+      var(--bg);
+  }
+
+  header {
+    text-align: center;
+    padding: 8px 0 18px;
+  }
+  .crest {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  .sub {
+    color: var(--ink-dim);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  .input-card {
+    max-width: 480px;
+    margin: 0 auto 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px 16px;
+  }
+  .input-label {
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  .input-row {
+    display: flex;
+    gap: 8px;
+  }
+  #coordInput {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 11px 12px;
+    font-size: 15px;
+    font-family: var(--font-body);
+  }
+  #coordInput::placeholder { color: var(--ink-dim); opacity: 0.7; }
+  #pasteBtn {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-family: var(--font-body);
+    white-space: nowrap;
+  }
+  #pasteBtn:active { transform: scale(0.96); }
+
+  #status {
+    max-width: 480px;
+    margin: 0 auto 18px;
+    text-align: center;
+    color: var(--ink-dim);
+    font-size: 14px;
+    min-height: 20px;
+  }
+  #status.err { color: var(--red); }
+
+  #locateBtn {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto 22px;
+    background: var(--gold);
+    color: #1c1408;
+    border: none;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 15px;
+    padding: 13px 30px;
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(232,184,84,0.25);
+  }
+  #locateBtn:active { transform: scale(0.98); }
+  #locateBtn:disabled { opacity: 0.6; }
+
+  #list {
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .row {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: 12px;
+  }
+  .rank {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--gold);
+    text-align: center;
+  }
+  .info { min-width: 0; }
+  .name {
+    font-size: 15.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dist {
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    margin-top: 3px;
+  }
+  .wait {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .wait .mins {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .wait .unit {
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin-top: 2px;
+  }
+  .wait.short .mins { color: var(--green); }
+  .wait.mid .mins { color: var(--amber); }
+  .wait.long .mins { color: var(--red); }
+  .wait.closed .mins { color: var(--ink-dim); font-size: 14px; }
+
+  footer {
+    text-align: center;
+    margin-top: 28px;
+    font-size: 11.5px;
+    color: var(--ink-dim);
+    opacity: 0.8;
+    line-height: 1.7;
+  }
+
+  .spinner {
+    display:inline-block;
+    width:16px; height:16px;
+    border: 2px solid var(--line);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: -3px;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty {
+    text-align:center;
+    color: var(--ink-dim);
+    font-size: 14px;
+    padding: 40px 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="crest">TOKYO DISNEYLAND</div>
+  <h1>近くの待ち時間</h1>
+  <div class="sub">座標を貼り付けて近いアトラクションを表示</div>
+</header>
+
+<div class="input-card">
+  <div class="input-label">
+    Googleマップの座標（35.632825, 139.881285）、共有リンク、またはPlus Code（例: JVMJ+22R 浦安市、千葉県）を貼り付けてください
+  </div>
+  <div class="input-row">
+    <input type="text" id="coordInput" placeholder="35.632825, 139.881285 / JVMJ+22R 浦安市" inputmode="text">
+    <button id="pasteBtn">貼付</button>
+  </div>
+</div>
+
+<div id="status"></div>
+<button id="locateBtn">この座標で探す</button>
+
+<div id="list"></div>
+
+<footer>
+  待ち時間データ: ThemeParks.wiki（非公式）<br>
+  入力した座標は端末内でのみ使用し、送信・保存されません
+</footer>
+
+<script>
+const API_BASE = "https://api.themeparks.wiki/v1";
+const DESTINATION_SLUG = "tokyodisneyresort";
+const PARK_NAME_MATCH = "Disneyland";
+
+const statusEl = document.getElementById('status');
+const listEl = document.getElementById('list');
+const btn = document.getElementById('locateBtn');
+const coordInput = document.getElementById('coordInput');
+const pasteBtn = document.getElementById('pasteBtn');
+
+function setStatus(html, isErr) {
+  statusEl.innerHTML = html;
+  statusEl.classList.toggle('err', !!isErr);
+}
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function formatDist(m) {
+  if (m < 1000) return Math.round(m) + " m";
+  return (m / 1000).toFixed(1) + " km";
+}
+
+function waitClass(mins) {
+  if (mins === null) return "closed";
+  if (mins <= 20) return "short";
+  if (mins <= 50) return "mid";
+  return "long";
+}
+
+// 「35.632825, 139.881285」形式や、Googleマップ共有URL（.../@35.632,139.881,17z や ?q=35.632,139.881 など）から緯度経度を抜き出す
+function parseCoordinates(raw) {
+  if (!raw) return null;
+  const text = raw.trim();
+
+  // パターン1: 素の "lat, lon"（度の値のみ）
+  const plain = text.match(/^(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)$/);
+  if (plain) {
+    const lat = parseFloat(plain[1]);
+    const lon = parseFloat(plain[2]);
+    if (isValidLatLon(lat, lon)) return { lat, lon };
+  }
+
+  // パターン2: Googleマップ共有URL内の @lat,lon,zoom
+  const atMatch = text.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if (atMatch) {
+    const lat = parseFloat(atMatch[1]);
+    const lon = parseFloat(atMatch[2]);
+    if (isValidLatLon(lat, lon)) return { lat, lon };
+  }
+
+  // パターン3: ?q=lat,lon または &q=lat,lon
+  const qMatch = text.match(/[?&]q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if (qMatch) {
+    const lat = parseFloat(qMatch[1]);
+    const lon = parseFloat(qMatch[2]);
+    if (isValidLatLon(lat, lon)) return { lat, lon };
+  }
+
+  // パターン4: Plus Code（フル or 短縮、例: "8Q7XJVMJ+55" や "JVMJ+22R 浦安市、千葉県"）
+  const plusCodeResult = tryParsePlusCode(text);
+  if (plusCodeResult) return plusCodeResult;
+
+  // パターン5: 文中のどこかにある最初の "数字, 数字" ペアを拾う（最後の手段）
+  const loose = text.match(/(-?\d{1,3}\.\d{3,})\D+(-?\d{1,3}\.\d{3,})/);
+  if (loose) {
+    const lat = parseFloat(loose[1]);
+    const lon = parseFloat(loose[2]);
+    if (isValidLatLon(lat, lon)) return { lat, lon };
+  }
+
+  return null;
+}
+
+function isValidLatLon(lat, lon) {
+  return !isNaN(lat) && !isNaN(lon) &&
+         lat >= -90 && lat <= 90 &&
+         lon >= -180 && lon <= 180;
+}
+
+// --- Plus Code (Open Location Code) デコード ---
+// Google公式アルゴリズムの実装。フルコード（8FVC9G8F+6X 等）と、
+// 「JVMJ+22R 浦安市、千葉県」のような地名付き短縮コードの両方に対応する。
+const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
+const OLC_SEPARATOR = "+";
+const OLC_PAIR_CODE_LEN = 10;
+const OLC_GRID_COLS = 4;
+const OLC_GRID_ROWS = 5;
+
+function olcDecodeFull(code) {
+  code = code.toUpperCase().split(OLC_SEPARATOR).join('').replace(/0+$/, '');
+  if (code.length < 8) return null; // フルデコードには最低8桁（緯度経度ペア4組）が必要
+
+  let southLat = -90, westLon = -180;
+  let latRes = 400, lonRes = 400;
+  let i = 0;
+
+  while (i < code.length && i < OLC_PAIR_CODE_LEN) {
+    if (i % 2 === 0) {
+      latRes /= 20;
+      const digit = OLC_ALPHABET.indexOf(code[i]);
+      if (digit < 0) return null;
+      southLat += latRes * digit;
+    } else {
+      lonRes /= 20;
+      const digit = OLC_ALPHABET.indexOf(code[i]);
+      if (digit < 0) return null;
+      westLon += lonRes * digit;
+    }
+    i++;
+  }
+
+  let rowRes = latRes / OLC_GRID_ROWS;
+  let colRes = lonRes / OLC_GRID_COLS;
+  while (i < code.length) {
+    const digit = OLC_ALPHABET.indexOf(code[i]);
+    if (digit < 0) return null;
+    const row = Math.floor(digit / OLC_GRID_COLS);
+    const col = digit % OLC_GRID_COLS;
+    southLat += rowRes * row;
+    westLon += colRes * col;
+    if (i + 1 < code.length) {
+      rowRes /= OLC_GRID_ROWS;
+      colRes /= OLC_GRID_COLS;
+    }
+    i++;
+  }
+
+  const usedGrid = code.length > OLC_PAIR_CODE_LEN;
+  const centerLat = southLat + (usedGrid ? rowRes / 2 : latRes / 2);
+  const centerLon = westLon + (usedGrid ? colRes / 2 : lonRes / 2);
+  return { lat: centerLat, lon: centerLon };
+}
+
+// 短縮コード（先頭が省略されている）を、地名から得た参照座標を使って復元する。
+// Plus Codeは4桁単位（4/6/8桁）で先頭が省略される仕様。
+// 例: "JVMJ+22R" は "+" の前が4桁 → 本来12桁のうち先頭8桁が省略されている。
+function olcRecoverNearest(shortCode, refLat, refLon) {
+  const sep = shortCode.indexOf(OLC_SEPARATOR);
+  if (sep < 0) return null;
+  const digitsBeforeSep = sep; // "+"より前の桁数（2, 4, 6のいずれかが短縮パターン）
+  const prefixLen = 8 - digitsBeforeSep;
+  if (prefixLen <= 0 || prefixLen > 8) return olcDecodeFull(shortCode);
+
+  const refCode = olcEncode(refLat, refLon, 10).split(OLC_SEPARATOR).join('');
+  const shortDigits = shortCode.toUpperCase().split(OLC_SEPARATOR).join('');
+  const fullDigits = refCode.substring(0, prefixLen) + shortDigits;
+  const fullCode = fullDigits.substring(0, 8) + OLC_SEPARATOR + fullDigits.substring(8);
+  return olcDecodeFull(fullCode);
+}
+
+function olcEncode(lat, lon, codeLength) {
+  codeLength = codeLength || OLC_PAIR_CODE_LEN;
+  if (lat === 90) lat -= 0.0000001;
+  while (lon < -180) lon += 360;
+  while (lon >= 180) lon -= 360;
+
+  const latVal = Math.floor((lat + 90) * 8000000);
+  const lonVal = Math.floor((lon + 180) * 8000000);
+
+  let code = "";
+  let latResVal = 400 * 8000000;
+  let lonResVal = 400 * 8000000;
+  for (let i = 0; i < 5; i++) {
+    latResVal = Math.floor(latResVal / 20);
+    lonResVal = Math.floor(lonResVal / 20);
+    const latDigit = Math.floor(latVal / latResVal) % 20;
+    const lonDigit = Math.floor(lonVal / lonResVal) % 20;
+    code += OLC_ALPHABET[latDigit] + OLC_ALPHABET[lonDigit];
+  }
+  code = code.substring(0, 8) + OLC_SEPARATOR + code.substring(8);
+  return code.substring(0, codeLength < 8 ? codeLength : (codeLength === 8 ? 8 : codeLength + 1));
+}
+
+// 都市名から大まかな参照座標を引く簡易辞書（東京ディズニーリゾート周辺での利用を想定）
+const CITY_REF = {
+  "浦安": { lat: 35.6531, lon: 139.9016 },
+  "千葉": { lat: 35.6073, lon: 140.1063 },
+  "urayasu": { lat: 35.6531, lon: 139.9016 },
+};
+
+function tryParsePlusCode(raw) {
+  const text = raw.trim();
+  // 例: "JVMJ+22R 浦安市、千葉県" / "8Q7XJVMJ+22R" / "JVMJ+22R"
+  const match = text.match(/([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{2,7})/i);
+  if (!match) return null;
+  const code = match[1].toUpperCase();
+
+  // フルコード（先頭8桁ある）ならそのままデコード
+  const beforePlus = code.split('+')[0];
+  if (beforePlus.length >= 8) {
+    const decoded = olcDecodeFull(code);
+    if (decoded && isValidLatLon(decoded.lat, decoded.lon)) return decoded;
+  }
+
+  // 短縮コード：地名らしき文字列を探して参照座標を決める
+  let ref = null;
+  for (const key in CITY_REF) {
+    if (text.includes(key)) { ref = CITY_REF[key]; break; }
+  }
+  // 地名が見つからなければ、東京ディズニーランド周辺をデフォルト参照点にする
+  if (!ref) ref = { lat: 35.6329, lon: 139.8804 };
+
+  const decoded = olcRecoverNearest(code, ref.lat, ref.lon);
+  if (decoded && isValidLatLon(decoded.lat, decoded.lon)) return decoded;
+  return null;
+}
+
+async function fetchJSON(url) {
+  let res;
+  try {
+    res = await fetch(url, { mode: 'cors', cache: 'no-store' });
+  } catch (networkErr) {
+    throw new Error(`ネットワークエラー: ${networkErr.message}（URL: ${url}）`);
+  }
+  if (!res.ok) {
+    throw new Error(`APIエラー ${res.status} ${res.statusText}（URL: ${url}）`);
+  }
+  return res.json();
+}
+
+async function findLandParkId() {
+  const dests = await fetchJSON(`${API_BASE}/destinations`);
+  const list = dests.destinations || [];
+  const tdr = list.find(d => d.slug === DESTINATION_SLUG) ||
+              list.find(d => (d.name || "").toLowerCase().includes("tokyo disney"));
+  if (!tdr) throw new Error("東京ディズニーリゾートが見つかりませんでした");
+
+  const parks = tdr.parks || [];
+  const land = parks.find(p => (p.name || "").includes(PARK_NAME_MATCH) && !(p.name || "").includes("Sea"));
+  if (!land) throw new Error("ディズニーランドのパーク情報が見つかりませんでした");
+  return land.id;
+}
+
+async function getAttractionsWithCoords(parkId) {
+  const children = await fetchJSON(`${API_BASE}/entity/${parkId}/children`);
+  const entities = (children.children || []).filter(e =>
+    e.entityType === "ATTRACTION" &&
+    e.location && typeof e.location.latitude === "number" && typeof e.location.longitude === "number"
+  );
+  return entities;
+}
+
+async function getLiveWaitTimes(parkId) {
+  const live = await fetchJSON(`${API_BASE}/entity/${parkId}/live`);
+  const map = {};
+  for (const item of (live.liveData || [])) {
+    let mins = null;
+    let status = item.status;
+    if (item.queue && item.queue.STANDBY && typeof item.queue.STANDBY.waitTime === "number") {
+      mins = item.queue.STANDBY.waitTime;
+    }
+    map[item.id] = { mins, status };
+  }
+  return map;
+}
+
+function renderEmpty(msg) {
+  listEl.innerHTML = msg ? `<div class="empty">${msg}</div>` : "";
+}
+
+function renderList(items) {
+  listEl.innerHTML = items.map((it, i) => {
+    const cls = waitClass(it.mins);
+    let waitHTML;
+    if (it.mins === null) {
+      const label = it.status === "CLOSED" ? "運休中" : it.status === "REFURBISHMENT" ? "整備中" : "情報なし";
+      waitHTML = `<div class="wait ${cls}"><div class="mins">${label}</div></div>`;
+    } else {
+      waitHTML = `<div class="wait ${cls}"><div class="mins">${it.mins}</div><div class="unit">分待ち</div></div>`;
+    }
+    return `
+      <div class="row">
+        <div class="rank">${i + 1}</div>
+        <div class="info">
+          <div class="name">${it.name}</div>
+          <div class="dist">${formatDist(it.distance)}</div>
+        </div>
+        ${waitHTML}
+      </div>
+    `;
+  }).join("");
+}
+
+async function run() {
+  const parsed = parseCoordinates(coordInput.value);
+  if (!parsed) {
+    setStatus("座標を読み取れませんでした。「35.632825, 139.881285」、Googleマップの共有リンク、またはPlus Code（例: JVMJ+22R 浦安市、千葉県）を貼り付けてください。", true);
+    return;
+  }
+
+  btn.disabled = true;
+  renderEmpty("");
+  setStatus('<span class="spinner"></span>アトラクション情報を取得しています…');
+
+  try {
+    const parkId = await findLandParkId();
+    const [attractions, waitMap] = await Promise.all([
+      getAttractionsWithCoords(parkId),
+      getLiveWaitTimes(parkId)
+    ]);
+
+    const withDist = attractions.map(a => ({
+      id: a.id,
+      name: a.name,
+      distance: haversineMeters(parsed.lat, parsed.lon, a.location.latitude, a.location.longitude),
+      mins: waitMap[a.id] ? waitMap[a.id].mins : null,
+      status: waitMap[a.id] ? waitMap[a.id].status : null
+    }));
+
+    withDist.sort((a, b) => a.distance - b.distance);
+    const nearest5 = withDist.slice(0, 5);
+
+    if (nearest5.length === 0) {
+      renderEmpty("アトラクション情報を取得できませんでした");
+      setStatus("");
+    } else {
+      renderList(nearest5);
+      const now = new Date();
+      setStatus(`座標 ${parsed.lat.toFixed(5)}, ${parsed.lon.toFixed(5)} / 更新: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`);
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus("");
+    renderEmpty("データの取得に失敗しました：" + (err && err.message ? err.message : String(err)));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+pasteBtn.addEventListener('click', async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    coordInput.value = text;
+  } catch (e) {
+    setStatus("クリップボードを読み取れませんでした。入力欄に直接貼り付けてください。", true);
+  }
+});
+
+btn.addEventListener('click', run);
+coordInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') run();
+});
+</script>
+
+</body>
+</html>
